@@ -121,11 +121,12 @@ def apply_patches(patch_path_iter, tree_path, reverse=False, patch_bin_path=None
         patch_paths.reverse()
 
     logger = get_logger()
+    failed_patches = []
     for patch_path, patch_num in zip(patch_paths, range(1, len(patch_paths) + 1)):
         cmd = [
             str(patch_bin_path), '-p1', '--ignore-whitespace', '-i',
             str(patch_path), '-d',
-            str(tree_path), '--no-backup-if-mismatch'
+            str(tree_path), '--no-backup-if-mismatch', '--dry-run'
         ]
         if reverse:
             cmd.append('--reverse')
@@ -133,10 +134,20 @@ def apply_patches(patch_path_iter, tree_path, reverse=False, patch_bin_path=None
         else:
             cmd.append('--forward')
             log_word = 'Applying'
-        logger.info('* %s %s (%s/%s)', log_word, patch_path.name, patch_num, len(patch_paths))
+        logger.info('* %s %s (%s/%s)', log_word, patch_path, patch_num, len(patch_paths))
         logger.debug(' '.join(cmd))
-        subprocess.run(cmd, check=True)
+        try:
+        #subprocess.run(cmd, check=True)
+            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError as e:
+            #logger.error('Failed to apply patch %s: %s', patch_path.name, e.stderr.decode())
+            failed_patches.append(patch_path)
 
+    # Print or log the failed patches
+    if failed_patches:
+        logger.info('Failed patches:')
+        for patch in failed_patches:
+            logger.error('  %s', patch)
 
 def generate_patches_from_series(patches_dir, resolve=False):
     """Generates pathlib.Path for patches from a directory in GNU Quilt format"""
